@@ -1,0 +1,13 @@
+.venv/
+.esphome/
+__pycache__/
+secrets.yaml
+secrets.*.yaml
+!secrets.example.yaml
+*.bin
+*.elf
+*.log
+*.db
+*.rar
+*.zip
+.DS_Store

@@ -1,0 +1,160 @@
+substitutions:
+  node_name: power-meter
+  display_name: Power Meter
+
+esphome:
+  name: ${node_name}
+  friendly_name: ${display_name}
+  name_add_mac_suffix: false
+  min_version: 2026.5.3
+  includes:
+    - <ESP8266WiFi.h>
+    - <daily_ledger.h>
+    - daily_ledger.h
+
+esp8266:
+  board: esp01_1m
+  restore_from_flash: true
+
+preferences:
+  flash_write_interval: 1min
+
+logger:
+  baud_rate: 0
+  level: INFO
+
+api:
+  reboot_timeout: 15min
+  encryption:
+    key: !secret api_encryption_key
+
+ota:
+  - platform: esphome
+    password: !secret ota_password
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  min_auth_mode: WPA2
+  reboot_timeout: 15min
+  power_save_mode: none
+  post_connect_roaming: false
+  ap:
+    ssid: ${display_name} Recovery
+    password: !secret fallback_ap_password
+
+captive_portal:
+
+debug:
+  update_interval: 60s
+
+uart:
+  id: meter_uart
+  rx_pin: GPIO03
+  tx_pin: GPIO01
+  baud_rate: 9600
+
+modbus:
+  id: meter_bus
+  uart_id: meter_uart
+
+globals:
+  - id: daily_state
+    type: meter_reliability::DailyState
+    restore_value: true
+  - id: daily_ledger
+    type: meter_reliability::DailyLedger
+    restore_value: false
+
+time:
+  - platform: homeassistant
+    id: meter_time
+    timezone: Asia/Shanghai
+  - platform: sntp
+    timezone: Asia/Shanghai
+
+sensor:
+  - platform: pzemac
+    id: meter_chip
+    modbus_id: meter_bus
+    update_interval: 1s
+    voltage:
+      name: Voltage
+    current:
+      name: Current
+    power:
+      name: Power
+    power_factor:
+      name: Power Factor
+    frequency:
+      name: Frequency
+    energy:
+      name: Energy
+      id: total_energy
+      unit_of_measurement: kWh
+      accuracy_decimals: 3
+      device_class: energy
+      state_class: total_increasing
+      filters:
+        - multiply: 0.001
+      on_value:
+        then:
+          - lambda: |-
+              const auto now = id(meter_time).now();
+              if (!now.is_valid()) {
+                id(daily_ledger).unavailable();
+                return;
+              }
+              id(daily_ledger).observe(id(daily_state), now.timestamp, x);
+  - platform: template
+    name: Today Energy
+    device_class: energy
+    unit_of_measurement: kWh
+    accuracy_decimals: 3
+    update_interval: 10s
+    lambda: |-
+      const auto now = id(meter_time).now();
+      if (!now.is_valid()) return NAN;
+      return id(daily_ledger).today(id(daily_state), now.timestamp);
+  - platform: template
+    name: Yesterday Energy
+    device_class: energy
+    unit_of_measurement: kWh
+    accuracy_decimals: 3
+    update_interval: 15s
+    lambda: |-
+      const auto now = id(meter_time).now();
+      if (!now.is_valid()) return NAN;
+      return id(daily_ledger).yesterday(id(daily_state), now.timestamp);
+  - platform: wifi_signal
+    name: WiFi RSSI
+    update_interval: 60s
+    entity_category: diagnostic
+  - platform: uptime
+    name: Uptime
+    update_interval: 300s
+    entity_category: diagnostic
+  - platform: debug
+    free:
+      name: Memory Free
+    fragmentation:
+      name: Memory Fragmentation
+    loop_time:
+      name: Loop Time
+
+text_sensor:
+  - platform: debug
+    reset_reason:
+      name: Restart Reason
+  - platform: template
+    name: IP
+    entity_category: diagnostic
+    update_interval: 30s
+    lambda: |-
+      const auto ip = WiFi.localIP();
+      if (static_cast<uint32_t>(ip) == 0) return {};
+      return std::string(ip.toString().c_str());
+
+button:
+  - platform: restart
+    name: Restart

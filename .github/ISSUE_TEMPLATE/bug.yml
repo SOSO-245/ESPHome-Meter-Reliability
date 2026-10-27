@@ -1,0 +1,30 @@
+name: Bug report
+description: Report a reproducible problem without credentials or household data
+body:
+  - type: markdown
+    attributes:
+      value: Do not attach secrets.yaml, firmware binaries, passwords, device IDs or full Home Assistant logs.
+  - type: input
+    id: versions
+    attributes:
+      label: Home Assistant and ESPHome versions
+    validations:
+      required: true
+  - type: input
+    id: hardware
+    attributes:
+      label: Board and metering module model
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce and expected result
+    validations:
+      required: true
+  - type: textarea
+    id: result
+    attributes:
+      label: Actual result and sanitized short error excerpt
+    validations:
+      required: true
